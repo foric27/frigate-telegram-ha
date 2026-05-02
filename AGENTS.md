@@ -47,6 +47,8 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - Do NOT use `trigger.event.data.callback_query_id` — HA `telegram_callback` event stores the ID in `trigger.event.data.id`.
 - Do NOT pass `verify_ssl` to `telegram_bot.send_message` — only media-sending actions (`send_photo`, `send_video`, `send_animation`) accept it.
 - Do NOT rely on HA's native int parsing for large callback IDs — always cast with `trigger.event.data.id | string` to avoid precision loss (Telegram IDs exceed JS safe-integer range).
+- Do NOT expect `response_variable` from `telegram_bot.send_*` to be a flat object — it returns `{"chats": [{"chat_id": ..., "message_id": ...}]}`. Access via `tg_resp.chats[0].message_id`.
+- Do NOT use `continue_on_error: true` during debugging — it silently swallows errors and leaves `response_variable` empty, making diagnosis impossible.
 
 ## NOTES
 - **Single blueprint**: `frigate_telegram.yaml` contains both MQTT triggers (`frigate/reviews`) and Telegram event triggers (`telegram_callback`). Uses `trigger.id` to branch between notification logic and callback logic.
