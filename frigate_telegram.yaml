@@ -221,7 +221,8 @@ actions:
                           {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
                           }}/end/{{ now().timestamp() }}/preview.gif
                         inline_keyboard:
-                          - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
+                          - - "🔴 Live:/send_live {{ camera }}"
+                            - "🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
                         chat_id: "{{ repeat.item }}"
                         verify_ssl: "{{ verify_ssl_input }}"
                         config_entry_id: "{{ config_entry_id }}"
@@ -296,8 +297,9 @@ actions:
                             chat_id: "{{ end_chat_id }}"
                             message_id: "{{ end_message_id }}"
                             inline_keyboard:
-                              - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
-                              - "🔴 Live:/send_live {{ camera }}"
+                              - - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}"
+                                - "📸 Фото:/send_snapshot {{ id_data }}"
+                              - - "🔴 Live:/send_live {{ camera }}"
               - action: input_text.set_value
                 data:
                   entity_id: "{{ input_text_entity }}"
