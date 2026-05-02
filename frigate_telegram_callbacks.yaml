@@ -1,0 +1,166 @@
+alias: "Frigate: Telegram команды (видео, фото, live, тревога, review)"
+description: >
+  Обработка inline-кнопок Telegram для Frigate.
+  Отправляет видео, снимки, live-view, тревоги и review-preview по запросу пользователя.
+# Триггеры: callback-команды от inline-кнопок Telegram
+triggers:
+  - event_type: telegram_callback
+    event_data:
+      command: /send_video
+    trigger: event
+    id: send_video
+  - event_type: telegram_callback
+    event_data:
+      command: /send_snapshot
+    trigger: event
+    id: send_snapshot
+  - event_type: telegram_callback
+    event_data:
+      command: /send_live
+    trigger: event
+    id: send_live
+  - event_type: telegram_callback
+    event_data:
+      command: /send_alarm
+    trigger: event
+    id: send_alarm
+  - event_type: telegram_callback
+    event_data:
+      command: /send_review_preview
+    trigger: event
+    id: send_review_preview
+conditions: []
+# Действия: определяем переменные и выбираем ветку обработки
+actions:
+  # Общие переменные для всех веток
+  - variables:
+      frigate_base_url: http://192.168.1.6:5000
+      config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+      chat_id: "{{ trigger.event.data.chat_id }}"
+      message_id: "{{ trigger.event.data.message.message_id }}"
+      camera_name:
+        cam_1: двор
+        cam_2: огород
+        cam_3: улица
+        cam_4: улица 2
+        cam_5: огород 2
+        cam_6: гараж
+      camera: >-
+        {{ trigger.event.data.args[0] if trigger.id in
+        ['send_video', 'send_live', 'send_alarm', 'send_review_preview'] else none }}
+      start_time: "{{ trigger.event.data.args[1] if trigger.id == 'send_video' else none }}"
+      end_time: "{{ trigger.event.data.args[2] if trigger.id == 'send_video' else none }}"
+      event_id: >-
+        {{ trigger.event.data.args[0] if trigger.id == 'send_snapshot' else
+        (trigger.event.data.args[1] if trigger.id == 'send_alarm' else
+        (trigger.event.data.args[1] if trigger.id == 'send_review_preview' else none)) }}
+      review_id: "{{ trigger.event.data.args[0] if trigger.id == 'send_review_preview' else none }}"
+  # Выбор ветки обработки по типу callback-команды
+  - choose:
+      # Ветка /send_video: отправка клипа события
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_video' }}"
+        sequence:
+          - continue_on_error: true
+            action: telegram_bot.send_video
+            data:
+              url: >-
+                {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+                }}/end/{{ end_time }}/clip.mp4
+              chat_id: "{{ chat_id }}"
+              parse_mode: markdownv2
+              verify_ssl: false
+              config_entry_id: "{{ config_entry_id }}"
+          # Убираем индикатор загрузки с кнопки
+          - continue_on_error: true
+            action: telegram_bot.answer_callback_query
+            data:
+              message: "📼 Видео отправлено"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+      # Ветка /send_snapshot: отправка чистого снимка
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_snapshot' }}"
+        sequence:
+          - continue_on_error: true
+            action: telegram_bot.send_photo
+            data:
+              url: >-
+                {{ frigate_base_url }}/api/events/{{ event_id
+                }}/snapshot-clean.webp
+              chat_id: "{{ chat_id }}"
+              verify_ssl: false
+              parse_mode: markdownv2
+              config_entry_id: "{{ config_entry_id }}"
+          - continue_on_error: true
+            action: telegram_bot.answer_callback_query
+            data:
+              message: "📸 Снимок отправлен"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+      # Ветка /send_live: отправка ссылки на live-view
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_live' }}"
+        sequence:
+          - continue_on_error: true
+            action: telegram_bot.send_message
+            data:
+              message: >-
+                🔴 [Live view {{ camera_name[camera] | default(camera)
+                }}]({{ frigate_base_url }}/cameras/{{ camera }})
+              chat_id: "{{ chat_id }}"
+              parse_mode: markdownv2
+              verify_ssl: false
+              config_entry_id: "{{ config_entry_id }}"
+          - continue_on_error: true
+            action: telegram_bot.answer_callback_query
+            data:
+              message: "🔴 Live view отправлен"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+      # Ветка /send_alarm: отправка снимка с подписью тревоги
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_alarm' }}"
+        sequence:
+          - continue_on_error: true
+            action: telegram_bot.send_photo
+            data:
+              url: >-
+                {{ frigate_base_url }}/api/events/{{ event_id
+                }}/snapshot-clean.webp
+              caption: >-
+                🚨 *ТРЕВОГА\!* Подтверждено обнаружение на камере *{{ camera_name[camera] | default(camera) }}*
+              chat_id: "{{ chat_id }}"
+              verify_ssl: false
+              parse_mode: markdownv2
+              config_entry_id: "{{ config_entry_id }}"
+          - continue_on_error: true
+            action: telegram_bot.answer_callback_query
+            data:
+              message: "🚨 Тревога отправлена"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+      # Ветка /send_review_preview: отправка review-preview видео
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_review_preview' }}"
+        sequence:
+          - continue_on_error: true
+            action: telegram_bot.send_video
+            data:
+              url: >-
+                {{ frigate_base_url }}/api/review/{{ review_id }}/preview
+              chat_id: "{{ chat_id }}"
+              parse_mode: markdownv2
+              verify_ssl: false
+              config_entry_id: "{{ config_entry_id }}"
+              caption: "📼 Review preview для {{ camera_name[camera] | default(camera) }}"
+          - continue_on_error: true
+            action: telegram_bot.answer_callback_query
+            data:
+              message: "📼 Review preview отправлен"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+# Режим автоматизации: параллельный (до 20 одновременных выполнений)
+mode: parallel
+max: 20
+max_exceeded: silent

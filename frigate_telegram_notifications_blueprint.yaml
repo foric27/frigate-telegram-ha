@@ -1,17 +1,68 @@
-alias: Frigate Motion Alert to Telegram new 2
-description: Автоматизация для отправки уведомлений из Frigate в Telegram.
+blueprint:
+  name: "Frigate → Telegram: уведомления о событиях"
+  description: >
+    Отправка уведомлений о событиях Frigate в Telegram.
+    Поддерживает live-анимацию, обновление сообщений (new/update/end),
+    inline-кнопки для просмотра видео, снимков, live и тревог.
+  domain: automation
+  input:
+    frigate_base_url:
+      name: Frigate URL
+      description: "Базовый URL Frigate (например: http://192.168.1.6:5000)"
+      selector:
+        text:
+          type: url
+      default: "http://192.168.1.6:5000"
+    telegram_config_entry_id:
+      name: Telegram Config Entry ID
+      description: "ID интеграции Telegram Bot из Home Assistant"
+      selector:
+        text:
+      default: ""
+    chat_ids:
+      name: Chat IDs
+      description: "Список ID чатов Telegram через запятую (например: 123456789,987654321)"
+      selector:
+        text:
+      default: ""
+    camera_whitelist:
+      name: Список камер
+      description: "Камеры Frigate через запятую (например: cam_1,cam_2,cam_3)"
+      selector:
+        text:
+      default: "cam_1,cam_2,cam_3,cam_4,cam_5,cam_6"
+    verify_ssl:
+      name: Проверять SSL
+      description: "Отключите для локных URL без валидного сертификата"
+      selector:
+        boolean:
+      default: false
+    input_text_prefix:
+      name: Префикс input_text helpers
+      description: "Префикс для создания input_text helpers (например: frigate_tg_msg)"
+      selector:
+        text:
+      default: "frigate_tg_msg"
+
+# Триггер: новый review-сегмент от Frigate (new / update / end)
 triggers:
   - trigger: mqtt
     options:
       topic: frigate/reviews
+
+# Фильтр: только камеры из белого списка
 conditions:
   - condition: template
     value_template: >-
       {{ trigger.payload_json['after']['camera'] in
-         ['cam_1', 'cam_2', 'cam_3', 'cam_4', 'cam_5', 'cam_6'] }}
+         (camera_whitelist | default('')).split(',') | map('trim') | list }}
+
 actions:
+  # Переменные, используемые во всех ветках (NEW / UPDATE / END)
   - variables:
-      frigate_base_url: http://192.168.1.6:5000
+      frigate_base_url: !input frigate_base_url
+      config_entry_id: !input telegram_config_entry_id
+      chat_list: "{{ (chat_ids | default('')).split(',') | map('trim') | list }}"
       object_name:
         person: человек🙍‍♂️
         face: лицо🧑
@@ -94,9 +145,11 @@ actions:
         {%- else %}
         🔴 *Событие активно*
         {%- endif %}
-      input_text_entity: "input_text.frigate_tg_msg_{{ camera }}"
+      input_text_entity: "input_text.{{ input_text_prefix }}_{{ camera }}"
       stored_ids: "{{ states(input_text_entity) | default('') }}"
       stored_pairs: "{{ stored_ids.split(',') if stored_ids else [] }}"
+
+  # Ветка NEW: отправка анимации при начале события
   - alias: NEW
     if:
       - alias: NEW ?
@@ -113,12 +166,11 @@ actions:
             }}/end/{{ now().timestamp() }}/preview.gif
           inline_keyboard:
             - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
-          chat_id:
-            - "442672175"
-            - "2058806977"
-          verify_ssl: false
-          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+          chat_id: "{{ chat_list }}"
+          verify_ssl: !input verify_ssl
+          config_entry_id: "{{ config_entry_id }}"
         response_variable: telegram_response
+      # Сохраняем chat_id:message_id для последующего редактирования
       - if:
           - condition: template
             value_template: "{{ telegram_response is defined and telegram_response.chats is defined }}"
@@ -128,6 +180,8 @@ actions:
               entity_id: "{{ input_text_entity }}"
               value: >-
                 {% for chat in telegram_response.chats %}{{ chat.chat_id }}:{{ chat.message_id }}{% if not loop.last %},{% endif %}{% endfor %}
+
+  # Ветка UPDATE: редактирование caption с актуальными данными
   - alias: UPDATE
     if:
       - alias: UPDATE ?
@@ -152,6 +206,8 @@ actions:
                     message_id: "{{ upd_message_id }}"
                     caption: "{{ message_template }}"
                     parse_mode: markdownv2
+
+  # Ветка END: финальное обновление caption и клавиатуры, очистка input_text
   - alias: END
     if:
       - alias: END ?
@@ -184,10 +240,13 @@ actions:
                     inline_keyboard:
                       - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
                       - "🔴 Live:/send_live {{ camera }}"
+          # Очищаем хранилище message_id после завершения события
           - action: input_text.set_value
             data:
               entity_id: "{{ input_text_entity }}"
               value: ""
+
+# Режим автоматизации: параллельный (до 20 одновременных выполнений)
 mode: parallel
 max: 20
 max_exceeded: silent
