@@ -61,17 +61,22 @@ actions:
       type: "{{ trigger.payload_json['type'] }}"
       start_time: "{{ trigger.payload_json['after']['start_time'] }}"
       end_time: "{{ trigger.payload_json['after']['end_time'] }}"
-      message_template: >-
-        🎥: ⚠️ *ВНИМАНИЕ*\: {% if objects | length > 0 %}{% for obj in objects
-        %} {{ object_name[obj] | default('неизвестный объект❓') }}{% if
-        sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} \({{
-        sub_labels[loop.index0] }}\){% endif %}{% if not loop.last %}, {% endif
-        %}{% endfor %} {% else %}объект не обнаружен🚫{% endif %} {% if audio |
-        length > 0 %} \(звук\: {% for sound in audio %}{{ audio_object[sound] |
-        default('неизвестный звук🔊') }}{% if not loop.last %}, {% endif %}{%
-        endfor %}\) {% endif %} *{{ camera_name[camera] | default(camera) }}* {% if end_time %}
-        \(продолжительность\: {{ (end_time - start_time) | int }} сек\.\) {%
-        endif %}
+      message_template: |-
+        🚨 *ВНИМАНИЕ\!* Обнаружено движение
+        {%- if objects | length > 0 %}
+        👁 *Объекты:* {% for obj in objects %}{{ object_name[obj] | default('❓ неизвестный') }}{% if sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} ({{ sub_labels[loop.index0] }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+        {%- else %}
+        ⚠️ *Объекты не обнаружены*
+        {%- endif %}
+        {%- if audio | length > 0 %}
+        🔊 *Звуки:* {% for sound in audio %}{{ audio_object[sound] | default('🔊 неизвестный') }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {%- endif %}
+        {%- if end_time %}
+        ⏱ *Длительность:* {{ (end_time - start_time) | int }} сек\.
+        {%- else %}
+        🔴 *Событие активно*
+        {%- endif %}
+        📹 *Камера:* *{{ camera_name[camera] | default(camera) }}*
   - alias: NEW
     if:
       - alias: NEW ?
@@ -86,6 +91,8 @@ actions:
           url: >-
             {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
             }}/end/{{ now().timestamp() }}/preview.gif
+          inline_keyboard:
+            - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
           chat_id:
             - "442672175"
             - "2058806977"
@@ -105,9 +112,9 @@ actions:
           url: >-
             {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
             }}/end/{{ end_time }}/preview.gif
-          inline_keyboard: >-
-            📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }},
-            📸 Фото:/send_snapshot {{ id_data }}
+          inline_keyboard:
+            - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
+            - "🔴 Live:/send_live {{ camera }}"
           chat_id:
             - 442672175
             - 2058806977
