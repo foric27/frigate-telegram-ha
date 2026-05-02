@@ -207,29 +207,39 @@ actions:
                 condition: template
                 value_template: "{{ type == 'new' }}"
             then:
-              - continue_on_error: true
-                action: telegram_bot.send_animation
-                data:
-                  caption: "{{ message_template }}"
-                  parse_mode: markdownv2
-                  url: >-
-                    {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
-                    }}/end/{{ now().timestamp() }}/preview.gif
-                  inline_keyboard:
-                    - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
-                  chat_id: "{{ chat_list }}"
-                  verify_ssl: "{{ verify_ssl_input }}"
-                  config_entry_id: "{{ config_entry_id }}"
-                response_variable: telegram_response
+              - variables:
+                  sent_pairs: []
+              - repeat:
+                  for_each: "{{ chat_list }}"
+                  sequence:
+                    - continue_on_error: true
+                      action: telegram_bot.send_animation
+                      data:
+                        caption: "{{ message_template }}"
+                        parse_mode: markdownv2
+                        url: >-
+                          {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+                          }}/end/{{ now().timestamp() }}/preview.gif
+                        inline_keyboard:
+                          - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
+                        chat_id: "{{ repeat.item }}"
+                        verify_ssl: "{{ verify_ssl_input }}"
+                        config_entry_id: "{{ config_entry_id }}"
+                      response_variable: tg_resp
+                    - if:
+                        - condition: template
+                          value_template: "{{ tg_resp is defined and tg_resp.message_id is defined }}"
+                      then:
+                        - variables:
+                            sent_pairs: "{{ sent_pairs + [repeat.item ~ ':' ~ tg_resp.message_id] }}"
               - if:
                   - condition: template
-                    value_template: "{{ telegram_response is defined and telegram_response.chats is defined }}"
+                    value_template: "{{ sent_pairs | length > 0 }}"
                 then:
                   - action: input_text.set_value
                     data:
                       entity_id: "{{ input_text_entity }}"
-                      value: >-
-                        {% for chat in telegram_response.chats %}{{ chat.chat_id }}:{{ chat.message_id }}{% if not loop.last %},{% endif %}{% endfor %}
+                      value: "{{ sent_pairs | join(',') }}"
 
           - alias: UPDATE
             if:
