@@ -94,10 +94,10 @@ mqtt:
 
 ### Подготовка репозитория
 
-1. Создайте репозиторий на GitHub (например: `myusername/frigate-telegram-ha`)
+1. Создайте репозиторий на GitHub (например: `foric27/frigate-telegram-ha`)
 2. Скопируйте файлы в репозиторий:
    ```bash
-   git clone https://github.com/myusername/frigate-telegram-ha.git
+   git clone https://github.com/foric27/frigate-telegram-ha.git
    cp frigate_telegram.yaml frigate-telegram-ha/
    cp README.md frigate-telegram-ha/
    ```
@@ -118,7 +118,7 @@ mqtt:
 Home Assistant поддерживает импорт blueprints по прямой ссылке на raw YAML:
 
 ```
-https://github.com/myusername/frigate-telegram-ha/raw/main/frigate_telegram.yaml
+https://github.com/foric27/frigate-telegram-ha/raw/main/frigate_telegram.yaml
 ```
 
 Пользователи могут вставить этот URL в:
