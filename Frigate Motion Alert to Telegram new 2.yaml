@@ -44,6 +44,16 @@ actions:
         cam_4: улица 2
         cam_5: огород 2
         cam_6: гараж
+      severity_map:
+        alert: 🚨 ТРЕВОГА
+        detection: ℹ️ Обнаружение
+      zone_name:
+        front_yard: передний двор
+        driveway: подъезд
+        garage: гараж
+        backyard: задний двор
+        street: улица
+        entrance: вход
       audio_object:
         bark: Лай собаки 🐶
         fire_alarm: Пожарная сирена 🚨
@@ -51,22 +61,30 @@ actions:
         speech: Речь 🗣️
         yell: Крик (громкий) 📢
         cat_roar: Рёв кота 🐱
+      review_id: "{{ trigger.payload_json['after']['id'] }}"
       id_data: >-
         {{ trigger.payload_json['after']['data']['detections'] | last |
-        default(trigger.payload_json['after']['id']) }}
+        default(review_id) }}
       camera: "{{ trigger.payload_json['after']['camera'] }}"
       objects: "{{ trigger.payload_json['after']['data']['objects'] | default([]) }}"
       sub_labels: "{{ trigger.payload_json['after']['data']['sub_labels'] | default([]) }}"
       audio: "{{ trigger.payload_json['after']['data']['audio'] | default([]) }}"
+      zones: "{{ trigger.payload_json['after']['data']['zones'] | default([]) }}"
+      severity: "{{ trigger.payload_json['after']['severity'] | default('detection') }}"
       type: "{{ trigger.payload_json['type'] }}"
       start_time: "{{ trigger.payload_json['after']['start_time'] }}"
       end_time: "{{ trigger.payload_json['after']['end_time'] }}"
+      thumb_path: "{{ trigger.payload_json['after']['thumb_path'] | default('') }}"
       message_template: |-
-        🚨 *ВНИМАНИЕ\!* Обнаружено движение
+        {% set cam = camera_name[camera] | default(camera) %}
+        *{{ severity_map[severity] | default('❓') }}* \| *{{ cam }}*
         {%- if objects | length > 0 %}
-        👁 *Объекты:* {% for obj in objects %}{{ object_name[obj] | default('❓ неизвестный') }}{% if sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} ({{ sub_labels[loop.index0] }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+        👁 *Объекты:* {% for obj in objects %}{{ object_name[obj] | default('❓') }}{% if sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} ({{ sub_labels[loop.index0] }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
         {%- else %}
         ⚠️ *Объекты не обнаружены*
+        {%- endif %}
+        {%- if zones | length > 0 %}
+        🎯 *Зоны:* {% for z in zones %}{{ zone_name[z] | default(z) }}{% if not loop.last %}, {% endif %}{% endfor %}
         {%- endif %}
         {%- if audio | length > 0 %}
         🔊 *Звуки:* {% for sound in audio %}{{ audio_object[sound] | default('🔊 неизвестный') }}{% if not loop.last %}, {% endif %}{% endfor %}
@@ -76,7 +94,9 @@ actions:
         {%- else %}
         🔴 *Событие активно*
         {%- endif %}
-        📹 *Камера:* *{{ camera_name[camera] | default(camera) }}*
+      input_text_entity: "input_text.frigate_tg_msg_{{ camera }}"
+      stored_ids: "{{ states(input_text_entity) | default('') }}"
+      stored_pairs: "{{ stored_ids.split(',') if stored_ids else [] }}"
   - alias: NEW
     if:
       - alias: NEW ?
@@ -98,28 +118,76 @@ actions:
             - "2058806977"
           verify_ssl: false
           config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+        response_variable: telegram_response
+      - if:
+          - condition: template
+            value_template: "{{ telegram_response is defined and telegram_response.chats is defined }}"
+        then:
+          - action: input_text.set_value
+            data:
+              entity_id: "{{ input_text_entity }}"
+              value: >-
+                {% for chat in telegram_response.chats %}{{ chat.chat_id }}:{{ chat.message_id }}{% if not loop.last %},{% endif %}{% endfor %}
+  - alias: UPDATE
+    if:
+      - alias: UPDATE ?
+        condition: template
+        value_template: "{{ type == 'update' }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ stored_pairs | length > 0 }}"
+        then:
+          - repeat:
+              for_each: "{{ stored_pairs }}"
+              sequence:
+                - variables:
+                    pair_parts: "{{ repeat.item.split(':') }}"
+                    upd_chat_id: "{{ pair_parts[0] }}"
+                    upd_message_id: "{{ pair_parts[1] }}"
+                - continue_on_error: true
+                  action: telegram_bot.edit_caption
+                  data:
+                    chat_id: "{{ upd_chat_id }}"
+                    message_id: "{{ upd_message_id }}"
+                    caption: "{{ message_template }}"
+                    parse_mode: markdownv2
   - alias: END
     if:
       - alias: END ?
         condition: template
         value_template: "{{ type == 'end' }}"
     then:
-      - continue_on_error: true
-        action: telegram_bot.send_animation
-        data:
-          caption: "{{ message_template }}"
-          parse_mode: markdownv2
-          url: >-
-            {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
-            }}/end/{{ end_time }}/preview.gif
-          inline_keyboard:
-            - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
-            - "🔴 Live:/send_live {{ camera }}"
-          chat_id:
-            - 442672175
-            - 2058806977
-          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
-          verify_ssl: false
+      - if:
+          - condition: template
+            value_template: "{{ stored_pairs | length > 0 }}"
+        then:
+          - repeat:
+              for_each: "{{ stored_pairs }}"
+              sequence:
+                - variables:
+                    pair_parts: "{{ repeat.item.split(':') }}"
+                    end_chat_id: "{{ pair_parts[0] }}"
+                    end_message_id: "{{ pair_parts[1] }}"
+                - continue_on_error: true
+                  action: telegram_bot.edit_caption
+                  data:
+                    chat_id: "{{ end_chat_id }}"
+                    message_id: "{{ end_message_id }}"
+                    caption: "{{ message_template }}"
+                    parse_mode: markdownv2
+                - continue_on_error: true
+                  action: telegram_bot.edit_replymarkup
+                  data:
+                    chat_id: "{{ end_chat_id }}"
+                    message_id: "{{ end_message_id }}"
+                    inline_keyboard:
+                      - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
+                      - "🔴 Live:/send_live {{ camera }}"
+          - action: input_text.set_value
+            data:
+              entity_id: "{{ input_text_entity }}"
+              value: ""
 mode: parallel
 max: 20
 max_exceeded: silent
