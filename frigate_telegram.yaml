@@ -313,7 +313,7 @@ actions:
           - variables:
               chat_id: "{{ trigger.event.data.chat_id }}"
               message_id: "{{ trigger.event.data.message.message_id }}"
-              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+              callback_query_id: "{{ trigger.event.data.id }}"
               camera: >-
                 {{ trigger.event.data.args[0] if trigger.id in
                 ['send_video', 'send_live', 'send_alarm', 'send_review_preview'] else none }}
