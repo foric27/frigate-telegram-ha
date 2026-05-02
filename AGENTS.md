@@ -8,25 +8,31 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 ## STRUCTURE
 ```
 .
-├── Frigate Motion Alert to Telegram new 2.yaml   # Main motion → Telegram alert with inline keyboard
-└── Frigate_telegram_run_command new.yaml          # Telegram callback → video / snapshot / live / alarm
+├── frigate_telegram_notifications.yaml           # Main motion → Telegram alert with inline keyboard
+├── frigate_telegram_callbacks.yaml               # Telegram callback → video / snapshot / live / alarm
+├── frigate_telegram_notifications_blueprint.yaml # Blueprint version of notifications
+├── frigate_telegram_callbacks_blueprint.yaml     # Blueprint version of callbacks
+├── README.md                                      # Installation guide and publishing instructions
+└── AGENTS.md                                      # This file — project knowledge base
 ```
 
 ## WHERE TO LOOK
 | Task | Location |
 |------|----------|
-| Add new object type or emoji mapping | `Frigate Motion Alert to Telegram new 2.yaml` → `object_name` map |
-| Add new camera alias | `Frigate Motion Alert to Telegram new 2.yaml` → `camera_name` map |
-| Change Telegram recipients | Both files → `chat_id` lists |
-| Add audio detection type | `Frigate Motion Alert to Telegram new 2.yaml` → `audio_object` map |
-| Modify callback commands (video/snapshot/live/alarm) | `Frigate_telegram_run_command new.yaml` |
-| **Change camera whitelist** | `Frigate Motion Alert to Telegram new 2.yaml` → top-level `conditions` template list |
-| **Adjust preview GIF range** | `Frigate Motion Alert to Telegram new 2.yaml` → `preview.gif` URL `start_time` / `end_time` params |
-| **Change inline keyboard buttons** | `Frigate Motion Alert to Telegram new 2.yaml` → `inline_keyboard` lists under NEW/END branches |
-| **Add new callback handler** | `Frigate_telegram_run_command new.yaml` → add `telegram_callback` trigger + `choose` branch |
-| **Change severity emoji mapping** | `Frigate Motion Alert to Telegram new 2.yaml` → `severity_map` |
-| **Change zone display names** | `Frigate Motion Alert to Telegram new 2.yaml` → `zone_name` map |
-| **Add review preview button** | `Frigate_telegram_run_command new.yaml` → add `/send_review_preview` trigger + branch |
+| Add new object type or emoji mapping | `frigate_telegram_notifications.yaml` → `object_name` map |
+| Add new camera alias | `frigate_telegram_notifications.yaml` → `camera_name` map |
+| Change Telegram recipients | Both files → `chat_id` lists (blueprint: input selector) |
+| Add audio detection type | `frigate_telegram_notifications.yaml` → `audio_object` map |
+| Modify callback commands (video/snapshot/live/alarm) | `frigate_telegram_callbacks.yaml` |
+| **Change camera whitelist** | `frigate_telegram_notifications.yaml` → top-level `conditions` template list (blueprint: input selector) |
+| **Adjust preview GIF range** | `frigate_telegram_notifications.yaml` → `preview.gif` URL `start_time` / `end_time` params |
+| **Change inline keyboard buttons** | `frigate_telegram_notifications.yaml` → `inline_keyboard` lists under NEW/END branches |
+| **Add new callback handler** | `frigate_telegram_callbacks.yaml` → add `telegram_callback` trigger + `choose` branch |
+| **Change severity emoji mapping** | `frigate_telegram_notifications.yaml` → `severity_map` |
+| **Change zone display names** | `frigate_telegram_notifications.yaml` → `zone_name` map |
+| **Add review preview button** | `frigate_telegram_callbacks.yaml` → add `/send_review_preview` trigger + branch |
+| **Install via blueprint** | `frigate_telegram_notifications_blueprint.yaml` and `frigate_telegram_callbacks_blueprint.yaml` |
+| **Installation instructions** | `README.md` |
 
 ## CONVENTIONS
 - **Language:** All user-facing strings are Russian. Object/place names use Cyrillic.
