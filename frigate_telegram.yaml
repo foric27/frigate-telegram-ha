@@ -195,9 +195,10 @@ actions:
                 {%- else %}
                 🔴 *Событие активно*
                 {%- endif %}
-              input_text_entity: "input_text.{{ input_text_prefix }}_{{ camera }}"
+              input_text_prefix_safe: "{{ input_text_prefix | default('frigate_tg_msg') }}"
+              input_text_entity: "input_text.{{ input_text_prefix_safe }}_{{ camera }}"
               stored_ids: "{{ states(input_text_entity) | default('') }}"
-              stored_pairs: "{{ stored_ids.split(',') if stored_ids else [] }}"
+              stored_pairs: "{{ stored_ids.split(',') if stored_ids and stored_ids != 'unknown' else [] }}"
 
           - alias: NEW
             if:
