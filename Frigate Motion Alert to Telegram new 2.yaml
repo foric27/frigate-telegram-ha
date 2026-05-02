@@ -1,0 +1,140 @@
+alias: Frigate Motion Alert to Telegram new 2
+description: Автоматизация для отправки уведомлений из Frigate в Telegram.
+triggers:
+  - trigger: mqtt
+    options:
+      topic: frigate/reviews
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.payload_json['after']['camera'] in
+         ['cam_1', 'cam_2', 'cam_3', 'cam_4', 'cam_5', 'cam_6'] }}
+actions:
+  - variables:
+      frigate_base_url: http://192.168.1.6:5000
+      frigate_base_url2: https://cam.foric27.ru
+      object_name:
+        person: человек🙍‍♂️
+        face: лицо🧑
+        car: машина🚗
+        motorcycle: мотоцикл🏍️
+        bicycle: велосипед🚲
+        boat: лодка🚤
+        license_plate: номерной знак📛
+        dog: собака🐶
+        cat: кот🐱
+        deer: олень🦌
+        horse: лошадь🐴
+        bird: птица🐦
+        raccoon: енот🦝
+        fox: лиса🦊
+        bear: медведь🐻
+        cow: корова🐄
+        squirrel: белка🐿️
+        goat: коза🐐
+        rabbit: кролик🐇
+        package: посылка📦
+        waste_bin: мусорный бак🗑️
+        bbq_grill: гриль🍖
+        robot_lawnmower: газонокосилка-робот🤖
+        umbrella: зонт☂️
+      camera_name:
+        cam_1: двор
+        cam_2: огород
+        cam_3: улица
+        cam_4: улица 2
+        cam_5: огород 2
+        cam_6: гараж
+      audio_object:
+        bark: Лай собаки 🐶
+        fire_alarm: Пожарная сирена 🚨
+        scream: Крик 😱
+        speech: Речь 🗣️
+        yell: Крик (громкий) 📢
+        cat_roar: Рёв кота 🐱
+      id: "{{ trigger.payload_json['after']['id'] }}"
+      id_data: >-
+        {{ trigger.payload_json['after']['data']['detections'] | last |
+        default(trigger.payload_json['after']['id']) }}
+      camera: "{{ trigger.payload_json['after']['camera'] }}"
+      objects: "{{ trigger.payload_json['after']['data']['objects'] | default([]) }}"
+      sub_labels: "{{ trigger.payload_json['after']['data']['sub_labels'] | default([]) }}"
+      audio: "{{ trigger.payload_json['after']['data']['audio'] | default([]) }}"
+      type: "{{ trigger.payload_json['type'] }}"
+      start_time: "{{ trigger.payload_json['after']['start_time'] }}"
+      end_time: "{{ trigger.payload_json['after']['end_time'] }}"
+      message_template: >-
+        🎥: ⚠️ *ВНИМАНИЕ*\: {% if objects | length > 0 %}{% for obj in objects
+        %} {{ object_name[obj] | default('неизвестный объект❓') }}{% if
+        sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} \({{
+        sub_labels[loop.index0] }}\){% endif %}{% if not loop.last %}, {% endif
+        %}{% endfor %} {% else %}объект не обнаружен🚫{% endif %} {% if audio |
+        length > 0 %} \(звук\: {% for sound in audio %}{{ audio_object[sound] |
+        default('неизвестный звук🔊') }}{% if not loop.last %}, {% endif %}{%
+        endfor %}\) {% endif %} *{{ camera_name[camera] | default(camera) }}* {% if end_time %}
+        \(продолжительность\: {{ (end_time - start_time) | int }} сек\.\) {%
+        endif %}
+  - alias: NEW
+    if:
+      - alias: NEW ?
+        condition: template
+        value_template: "{{ type == 'new' }}"
+    then:
+      - continue_on_error: true
+        action: telegram_bot.send_photo
+        data:
+          caption: "{{ message_template }}"
+          parse_mode: markdownv2
+          url: >-
+            {{ frigate_base_url }}/api/events/{{ id_data
+            }}/snapshot.jpg?timestamp=1&bbox=1&crop=1&quality=90
+          chat_id:
+            - "442672175"
+            - "2058806977"
+          verify_ssl: false
+          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+  - alias: UPDATE
+    if:
+      - alias: UPDATE ?
+        condition: template
+        value_template: "{{ type == 'update' }}"
+    then:
+      - continue_on_error: true
+        action: telegram_bot.send_photo
+        data:
+          caption: "{{ message_template }}"
+          parse_mode: markdownv2
+          url: >-
+            {{ frigate_base_url }}/api/events/{{ id_data
+            }}/snapshot.jpg?timestamp=1&bbox=1&crop=1&quality=90
+          chat_id:
+            - "442672175"
+            - "2058806977"
+          verify_ssl: false
+          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+    enabled: false
+  - alias: END
+    if:
+      - alias: END ?
+        condition: template
+        value_template: "{{ type == 'end' }}"
+    then:
+      - continue_on_error: true
+        action: telegram_bot.send_animation
+        data:
+          caption: "{{ message_template }}"
+          parse_mode: markdownv2
+          url: >-
+            {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+            }}/end/{{ end_time }}/preview.gif
+          inline_keyboard: >-
+            📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }},
+            📸 Фото:/send_snapshot {{ id_data }}
+          chat_id:
+            - 442672175
+            - 2058806977
+          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+          verify_ssl: false
+mode: parallel
+max: 20
+max_exceeded: silent

@@ -1,0 +1,57 @@
+alias: Frigate_telegram_run_command new
+description: Автоматизация для отправки видео или снимков через Telegram
+triggers:
+  - event_type: telegram_callback
+    event_data:
+      command: /send_video
+    trigger: event
+    id: send_video
+  - event_type: telegram_callback
+    event_data:
+      command: /send_snapshot
+    trigger: event
+    id: send_snapshot
+conditions: []
+actions:
+  - variables:
+      frigate_base_url: http://192.168.1.6:5000
+      frigate_base_url2: https://cam.foric27.ru
+      chat_id: "{{ trigger.event.data.chat_id }}"
+      camera: "{{ trigger.event.data.args[0] if trigger.id == 'send_video' else none }}"
+      start_time: "{{ trigger.event.data.args[1] if trigger.id == 'send_video' else none }}"
+      end_time: "{{ trigger.event.data.args[2] if trigger.id == 'send_video' else none }}"
+      event_id: >-
+        {{ trigger.event.data.args[0] if trigger.id == 'send_snapshot' else none
+        }}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_video' }}"
+        sequence:
+          - data:
+              url: >-
+                {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+                }}/end/{{ end_time }}/clip.mp4
+              chat_id: "{{ chat_id }}"
+              parse_mode: markdownv2
+              verify_ssl: false
+              config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+            continue_on_error: true
+            action: telegram_bot.send_video
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'send_snapshot' }}"
+        sequence:
+          - data:
+              url: >-
+                {{ frigate_base_url }}/api/events/{{ event_id
+                }}/snapshot-clean.webp
+              chat_id: "{{ chat_id }}"
+              verify_ssl: false
+              parse_mode: markdownv2
+              config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
+            continue_on_error: true
+            action: telegram_bot.send_photo
+mode: parallel
+max: 20
+max_exceeded: silent
