@@ -229,10 +229,14 @@ actions:
                       response_variable: tg_resp
                     - if:
                         - condition: template
-                          value_template: "{{ tg_resp is defined and tg_resp.message_id is defined }}"
+                          value_template: >-
+                            {{ tg_resp is defined
+                            and tg_resp.chats is defined
+                            and tg_resp.chats | length > 0
+                            and tg_resp.chats[0].message_id is defined }}
                       then:
                         - variables:
-                            sent_pairs: "{{ sent_pairs + [repeat.item ~ ':' ~ tg_resp.message_id] }}"
+                            sent_pairs: "{{ sent_pairs + [repeat.item ~ ':' ~ tg_resp.chats[0].message_id] }}"
               - if:
                   - condition: template
                     value_template: "{{ sent_pairs | length > 0 }}"
