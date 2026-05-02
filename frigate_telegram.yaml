@@ -45,6 +45,11 @@ blueprint:
         text:
       default: "frigate_tg_msg"
 
+# === ПЕРЕМЕННЫЕ УРОВНЯ АВТОМАТИЗАЦИИ ===
+# Делаем blueprint inputs доступными в conditions и triggers
+variables:
+  camera_entities_list: !input camera_entities
+
 # === ТРИГГЕРЫ ===
 triggers:
   # Frigate review-события (new / update / end)
@@ -88,7 +93,7 @@ conditions:
     value_template: >-
       {{ trigger.id != 'frigate_review' or
          ((trigger.payload_json | default({})).get('after', {}) | default({})).get('camera', '') in
-         (camera_entities | default([]) | map('replace', 'camera.', '') | list) }}
+         (camera_entities_list | default([]) | map('replace', 'camera.', '') | list) }}
 
 # === ДЕЙСТВИЯ ===
 actions:
