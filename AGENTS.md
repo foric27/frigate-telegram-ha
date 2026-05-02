@@ -8,30 +8,27 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 ## STRUCTURE
 ```
 .
-├── frigate_telegram_notifications.yaml           # Main motion → Telegram alert with inline keyboard
-├── frigate_telegram_callbacks.yaml               # Telegram callback → video / snapshot / live / alarm
-├── frigate_telegram_notifications_blueprint.yaml # Blueprint version of notifications
-├── frigate_telegram_callbacks_blueprint.yaml     # Blueprint version of callbacks
-├── README.md                                      # Installation guide and publishing instructions
-└── AGENTS.md                                      # This file — project knowledge base
+├── frigate_telegram.yaml   # Blueprint: уведомления (MQTT) + callback-команды (Telegram events) в одном файле
+├── README.md               # Installation guide and publishing instructions
+└── AGENTS.md               # This file — project knowledge base
 ```
 
 ## WHERE TO LOOK
 | Task | Location |
 |------|----------|
-| Add new object type or emoji mapping | `frigate_telegram_notifications.yaml` → `object_name` map |
-| Add new camera alias | `frigate_telegram_notifications.yaml` → `camera_name` map |
-| Change Telegram recipients | Both files → `chat_id` lists (blueprint: input selector) |
-| Add audio detection type | `frigate_telegram_notifications.yaml` → `audio_object` map |
-| Modify callback commands (video/snapshot/live/alarm) | `frigate_telegram_callbacks.yaml` |
-| **Change camera whitelist** | `frigate_telegram_notifications.yaml` → top-level `conditions` template list (blueprint: input selector) |
-| **Adjust preview GIF range** | `frigate_telegram_notifications.yaml` → `preview.gif` URL `start_time` / `end_time` params |
-| **Change inline keyboard buttons** | `frigate_telegram_notifications.yaml` → `inline_keyboard` lists under NEW/END branches |
-| **Add new callback handler** | `frigate_telegram_callbacks.yaml` → add `telegram_callback` trigger + `choose` branch |
-| **Change severity emoji mapping** | `frigate_telegram_notifications.yaml` → `severity_map` |
-| **Change zone display names** | `frigate_telegram_notifications.yaml` → `zone_name` map |
-| **Add review preview button** | `frigate_telegram_callbacks.yaml` → add `/send_review_preview` trigger + branch |
-| **Install via blueprint** | `frigate_telegram_notifications_blueprint.yaml` and `frigate_telegram_callbacks_blueprint.yaml` |
+| Add new object type or emoji mapping | `frigate_telegram.yaml` → `object_name` map (variables block) |
+| Add new camera alias | `frigate_telegram.yaml` → `camera_name` map |
+| Change Telegram recipients | `frigate_telegram.yaml` → `chat_ids` input (blueprint) |
+| Add audio detection type | `frigate_telegram.yaml` → `audio_object` map |
+| Modify callback commands (video/snapshot/live/alarm) | `frigate_telegram.yaml` → callback branch (`send_video`, `send_snapshot`, etc.) |
+| **Change camera whitelist** | `frigate_telegram.yaml` → top-level `conditions` template (blueprint: `camera_whitelist` input) |
+| **Adjust preview GIF range** | `frigate_telegram.yaml` → `preview.gif` URL `start_time` / `end_time` params in NEW branch |
+| **Change inline keyboard buttons** | `frigate_telegram.yaml` → `inline_keyboard` lists under NEW/END branches |
+| **Add new callback handler** | `frigate_telegram.yaml` → add `telegram_callback` trigger + nested `choose` branch |
+| **Change severity emoji mapping** | `frigate_telegram.yaml` → `severity_map` |
+| **Change zone display names** | `frigate_telegram.yaml` → `zone_name` map |
+| **Add review preview button** | `frigate_telegram.yaml` → add `/send_review_preview` trigger + callback branch |
+| **Install via blueprint** | `frigate_telegram.yaml` (single blueprint) |
 | **Installation instructions** | `README.md` |
 
 ## CONVENTIONS
@@ -49,10 +46,11 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - Do NOT try to edit a message with `message_id: "last"` from a different chat — store exact `chat_id:message_id` pairs per camera.
 
 ## NOTES
+- **Single blueprint**: `frigate_telegram.yaml` contains both MQTT triggers (`frigate/reviews`) and Telegram event triggers (`telegram_callback`). Uses `trigger.id` to branch between notification logic and callback logic.
 - Trigger source: MQTT topic `frigate/reviews` (Frigate reviews API).
-- Automation modes: `parallel` with `max: 20` and `max_exceeded: silent`. High burst of events possible.
-- `config_entry_id` is hardcoded — tied to a specific Telegram bot integration instance in HA.
-- Camera whitelist filter lives in top-level `conditions`; edit the inline list to include/exclude cameras.
+- Automation mode: `parallel` with `max: 20` and `max_exceeded: silent`. High burst of events possible.
+- `config_entry_id` comes from blueprint input (`!input telegram_config_entry_id`).
+- Camera whitelist filter lives in top-level `conditions` using `trigger.id` check for safety.
 - `NEW` branch sends a live `preview.gif` (from `start_time` to `now()`); `END` branch sends the final `preview.gif` (from `start_time` to `end_time`).
 - All Telegram send actions use `continue_on_error: true` so a failed send does not block the automation.
 - `camera_name[camera] | default(camera)` is used so unknown cameras render gracefully.
@@ -61,4 +59,4 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - **Message updates** (`edit_caption` + `edit_replymarkup`): `NEW` captures `response_variable` from `send_animation`, stores `chat_id:message_id` pairs in `input_text.frigate_tg_msg_{camera}`. `UPDATE` edits the same message caption with fresh objects/zones/duration. `END` edits caption to final duration and replaces keyboard with 📼/📸/🔴 buttons, then clears the helper.
 - **Required HA helpers**: Create one `input_text` per camera named `input_text.frigate_tg_msg_cam_1` through `cam_6`. Max length should accommodate ~50 chars (e.g. `442672175:12345,2058806977:67890`).
 - **Callback UX**: All callback branches end with `telegram_bot.answer_callback_query` to remove the "loading" spinner from the button press.
-- `config_entry_id` is stored as a variable in the callback automation to avoid repetition across branches.
+- `config_entry_id` is stored as a top-level variable to avoid repetition across branches.

@@ -1,0 +1,419 @@
+blueprint:
+  name: "Frigate ↔ Telegram: уведомления и callback-команды"
+  description: >
+    Объединённая автоматизация для отправки уведомлений Frigate в Telegram
+    и обработки inline-кнопок (видео, снимки, live, тревога, review).
+  domain: automation
+  input:
+    frigate_base_url:
+      name: Frigate URL
+      description: "Базовый URL Frigate (например: http://192.168.1.6:5000)"
+      selector:
+        text:
+          type: url
+      default: "http://192.168.1.6:5000"
+    telegram_config_entry_id:
+      name: Telegram Config Entry ID
+      description: "ID интеграции Telegram Bot из Home Assistant"
+      selector:
+        text:
+      default: ""
+    chat_ids:
+      name: Chat IDs
+      description: "Список ID чатов Telegram через запятую (например: 123456789,987654321)"
+      selector:
+        text:
+      default: ""
+    camera_whitelist:
+      name: Список камер
+      description: "Камеры Frigate через запятую (например: cam_1,cam_2,cam_3)"
+      selector:
+        text:
+      default: "cam_1,cam_2,cam_3,cam_4,cam_5,cam_6"
+    verify_ssl:
+      name: Проверять SSL
+      description: "Отключите для локальных URL без валидного сертификата"
+      selector:
+        boolean:
+      default: false
+    input_text_prefix:
+      name: Префикс input_text helpers
+      description: "Префикс для создания input_text helpers (например: frigate_tg_msg)"
+      selector:
+        text:
+      default: "frigate_tg_msg"
+
+# === ТРИГГЕРЫ ===
+triggers:
+  # Frigate review-события (new / update / end)
+  - trigger: mqtt
+    options:
+      topic: frigate/reviews
+    id: frigate_review
+
+  # Callback-команды от inline-кнопок Telegram
+  - event_type: telegram_callback
+    event_data:
+      command: /send_video
+    trigger: event
+    id: send_video
+  - event_type: telegram_callback
+    event_data:
+      command: /send_snapshot
+    trigger: event
+    id: send_snapshot
+  - event_type: telegram_callback
+    event_data:
+      command: /send_live
+    trigger: event
+    id: send_live
+  - event_type: telegram_callback
+    event_data:
+      command: /send_alarm
+    trigger: event
+    id: send_alarm
+  - event_type: telegram_callback
+    event_data:
+      command: /send_review_preview
+    trigger: event
+    id: send_review_preview
+
+# === УСЛОВИЯ ===
+# Для MQTT-триггера — только камеры из белого списка.
+# Для callback-триггеров условие пропускается (всегда true).
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.id != 'frigate_review' or
+         ((trigger.payload_json | default({})).get('after', {}) | default({})).get('camera', '') in
+         (camera_whitelist | default('')).split(',') | map('trim') | list }}
+
+# === ДЕЙСТВИЯ ===
+actions:
+  # Общие переменные (безопасны для всех типов триггеров)
+  - variables:
+      frigate_base_url: !input frigate_base_url
+      config_entry_id: !input telegram_config_entry_id
+      chat_list: "{{ (chat_ids | default('')).split(',') | map('trim') | list }}"
+      verify_ssl_input: !input verify_ssl
+      object_name:
+        person: человек🙍‍♂️
+        face: лицо🧑
+        car: машина🚗
+        motorcycle: мотоцикл🏍️
+        bicycle: велосипед🚲
+        boat: лодка🚤
+        license_plate: номерной знак📛
+        dog: собака🐶
+        cat: кот🐱
+        deer: олень🦌
+        horse: лошадь🐴
+        bird: птица🐦
+        raccoon: енот🦝
+        fox: лиса🦊
+        bear: медведь🐻
+        cow: корова🐄
+        squirrel: белка🐿️
+        goat: коза🐐
+        rabbit: кролик🐇
+        package: посылка📦
+        waste_bin: мусорный бак🗑️
+        bbq_grill: гриль🍖
+        robot_lawnmower: газонокосилка-робот🤖
+        umbrella: зонт☂️
+      camera_name:
+        cam_1: двор
+        cam_2: огород
+        cam_3: улица
+        cam_4: улица 2
+        cam_5: огород 2
+        cam_6: гараж
+      severity_map:
+        alert: 🚨 ТРЕВОГА
+        detection: ℹ️ Обнаружение
+      zone_name:
+        front_yard: передний двор
+        driveway: подъезд
+        garage: гараж
+        backyard: задний двор
+        street: улица
+        entrance: вход
+      audio_object:
+        bark: Лай собаки 🐶
+        fire_alarm: Пожарная сирена 🚨
+        scream: Крик 😱
+        speech: Речь 🗣️
+        yell: Крик (громкий) 📢
+        cat_roar: Рёв кота 🐱
+
+  # === ВЕТВЛЕНИЕ: Frigate reviews vs Callback-команды ===
+  - choose:
+
+      # === ВЕТКА 1: Frigate Reviews (уведомления new/update/end) ===
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'frigate_review' }}"
+        sequence:
+          - variables:
+              review_id: "{{ trigger.payload_json['after']['id'] }}"
+              id_data: >-
+                {{ trigger.payload_json['after']['data']['detections'] | last |
+                default(review_id) }}
+              camera: "{{ trigger.payload_json['after']['camera'] }}"
+              objects: "{{ trigger.payload_json['after']['data']['objects'] | default([]) }}"
+              sub_labels: "{{ trigger.payload_json['after']['data']['sub_labels'] | default([]) }}"
+              audio: "{{ trigger.payload_json['after']['data']['audio'] | default([]) }}"
+              zones: "{{ trigger.payload_json['after']['data']['zones'] | default([]) }}"
+              severity: "{{ trigger.payload_json['after']['severity'] | default('detection') }}"
+              type: "{{ trigger.payload_json['type'] }}"
+              start_time: "{{ trigger.payload_json['after']['start_time'] }}"
+              end_time: "{{ trigger.payload_json['after']['end_time'] }}"
+              thumb_path: "{{ trigger.payload_json['after']['thumb_path'] | default('') }}"
+              message_template: |-
+                {% set cam = camera_name[camera] | default(camera) %}
+                *{{ severity_map[severity] | default('❓') }}* \| *{{ cam }}*
+                {%- if objects | length > 0 %}
+                👁 *Объекты:* {% for obj in objects %}{{ object_name[obj] | default('❓') }}{% if sub_labels | length > 0 and loop.index0 < sub_labels | length and sub_labels[loop.index0] %} ({{ sub_labels[loop.index0] }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+                {%- else %}
+                ⚠️ *Объекты не обнаружены*
+                {%- endif %}
+                {%- if zones | length > 0 %}
+                🎯 *Зоны:* {% for z in zones %}{{ zone_name[z] | default(z) }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {%- endif %}
+                {%- if audio | length > 0 %}
+                🔊 *Звуки:* {% for sound in audio %}{{ audio_object[sound] | default('🔊 неизвестный') }}{% if not loop.last %}, {% endif %}{% endfor %}
+                {%- endif %}
+                {%- if end_time %}
+                ⏱ *Длительность:* {{ (end_time - start_time) | int }} сек\.
+                {%- else %}
+                🔴 *Событие активно*
+                {%- endif %}
+              input_text_entity: "input_text.{{ input_text_prefix }}_{{ camera }}"
+              stored_ids: "{{ states(input_text_entity) | default('') }}"
+              stored_pairs: "{{ stored_ids.split(',') if stored_ids else [] }}"
+
+          - alias: NEW
+            if:
+              - alias: NEW ?
+                condition: template
+                value_template: "{{ type == 'new' }}"
+            then:
+              - continue_on_error: true
+                action: telegram_bot.send_animation
+                data:
+                  caption: "{{ message_template }}"
+                  parse_mode: markdownv2
+                  url: >-
+                    {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+                    }}/end/{{ now().timestamp() }}/preview.gif
+                  inline_keyboard:
+                    - "🔴 Live:/send_live {{ camera }}, 🚨 Тревога:/send_alarm {{ camera }} {{ id_data }}"
+                  chat_id: "{{ chat_list }}"
+                  verify_ssl: "{{ verify_ssl_input }}"
+                  config_entry_id: "{{ config_entry_id }}"
+                response_variable: telegram_response
+              - if:
+                  - condition: template
+                    value_template: "{{ telegram_response is defined and telegram_response.chats is defined }}"
+                then:
+                  - action: input_text.set_value
+                    data:
+                      entity_id: "{{ input_text_entity }}"
+                      value: >-
+                        {% for chat in telegram_response.chats %}{{ chat.chat_id }}:{{ chat.message_id }}{% if not loop.last %},{% endif %}{% endfor %}
+
+          - alias: UPDATE
+            if:
+              - alias: UPDATE ?
+                condition: template
+                value_template: "{{ type == 'update' }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ stored_pairs | length > 0 }}"
+                then:
+                  - repeat:
+                      for_each: "{{ stored_pairs }}"
+                      sequence:
+                        - variables:
+                            pair_parts: "{{ repeat.item.split(':') }}"
+                            upd_chat_id: "{{ pair_parts[0] }}"
+                            upd_message_id: "{{ pair_parts[1] }}"
+                        - continue_on_error: true
+                          action: telegram_bot.edit_caption
+                          data:
+                            chat_id: "{{ upd_chat_id }}"
+                            message_id: "{{ upd_message_id }}"
+                            caption: "{{ message_template }}"
+                            parse_mode: markdownv2
+
+          - alias: END
+            if:
+              - alias: END ?
+                condition: template
+                value_template: "{{ type == 'end' }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ stored_pairs | length > 0 }}"
+                then:
+                  - repeat:
+                      for_each: "{{ stored_pairs }}"
+                      sequence:
+                        - variables:
+                            pair_parts: "{{ repeat.item.split(':') }}"
+                            end_chat_id: "{{ pair_parts[0] }}"
+                            end_message_id: "{{ pair_parts[1] }}"
+                        - continue_on_error: true
+                          action: telegram_bot.edit_caption
+                          data:
+                            chat_id: "{{ end_chat_id }}"
+                            message_id: "{{ end_message_id }}"
+                            caption: "{{ message_template }}"
+                            parse_mode: markdownv2
+                        - continue_on_error: true
+                          action: telegram_bot.edit_replymarkup
+                          data:
+                            chat_id: "{{ end_chat_id }}"
+                            message_id: "{{ end_message_id }}"
+                            inline_keyboard:
+                              - "📼 Видео:/send_video {{ camera }} {{ start_time }} {{ end_time }}, 📸 Фото:/send_snapshot {{ id_data }}"
+                              - "🔴 Live:/send_live {{ camera }}"
+              - action: input_text.set_value
+                data:
+                  entity_id: "{{ input_text_entity }}"
+                  value: ""
+
+      # === ВЕТКА 2: Callback-команды Telegram ===
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.id in ['send_video', 'send_snapshot', 'send_live',
+              'send_alarm', 'send_review_preview'] }}
+        sequence:
+          - variables:
+              chat_id: "{{ trigger.event.data.chat_id }}"
+              message_id: "{{ trigger.event.data.message.message_id }}"
+              callback_query_id: "{{ trigger.event.data.callback_query_id }}"
+              camera: >-
+                {{ trigger.event.data.args[0] if trigger.id in
+                ['send_video', 'send_live', 'send_alarm', 'send_review_preview'] else none }}
+              start_time: "{{ trigger.event.data.args[1] if trigger.id == 'send_video' else none }}"
+              end_time: "{{ trigger.event.data.args[2] if trigger.id == 'send_video' else none }}"
+              event_id: >-
+                {{ trigger.event.data.args[0] if trigger.id == 'send_snapshot' else
+                (trigger.event.data.args[1] if trigger.id == 'send_alarm' else
+                (trigger.event.data.args[1] if trigger.id == 'send_review_preview' else none)) }}
+              review_id: "{{ trigger.event.data.args[0] if trigger.id == 'send_review_preview' else none }}"
+
+          - choose:
+              # /send_video
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'send_video' }}"
+                sequence:
+                  - continue_on_error: true
+                    action: telegram_bot.send_video
+                    data:
+                      url: >-
+                        {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+                        }}/end/{{ end_time }}/clip.mp4
+                      chat_id: "{{ chat_id }}"
+                      parse_mode: markdownv2
+                      verify_ssl: "{{ verify_ssl_input }}"
+                      config_entry_id: "{{ config_entry_id }}"
+                  - continue_on_error: true
+                    action: telegram_bot.answer_callback_query
+                    data:
+                      message: "📼 Видео отправлено"
+                      callback_query_id: "{{ callback_query_id }}"
+
+              # /send_snapshot
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'send_snapshot' }}"
+                sequence:
+                  - continue_on_error: true
+                    action: telegram_bot.send_photo
+                    data:
+                      url: >-
+                        {{ frigate_base_url }}/api/events/{{ event_id
+                        }}/snapshot-clean.webp
+                      chat_id: "{{ chat_id }}"
+                      verify_ssl: "{{ verify_ssl_input }}"
+                      parse_mode: markdownv2
+                      config_entry_id: "{{ config_entry_id }}"
+                  - continue_on_error: true
+                    action: telegram_bot.answer_callback_query
+                    data:
+                      message: "📸 Снимок отправлен"
+                      callback_query_id: "{{ callback_query_id }}"
+
+              # /send_live
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'send_live' }}"
+                sequence:
+                  - continue_on_error: true
+                    action: telegram_bot.send_message
+                    data:
+                      message: >-
+                        🔴 [Live view {{ camera_name[camera] | default(camera)
+                        }}]({{ frigate_base_url }}/cameras/{{ camera }})
+                      chat_id: "{{ chat_id }}"
+                      parse_mode: markdownv2
+                      verify_ssl: "{{ verify_ssl_input }}"
+                      config_entry_id: "{{ config_entry_id }}"
+                  - continue_on_error: true
+                    action: telegram_bot.answer_callback_query
+                    data:
+                      message: "🔴 Live view отправлен"
+                      callback_query_id: "{{ callback_query_id }}"
+
+              # /send_alarm
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'send_alarm' }}"
+                sequence:
+                  - continue_on_error: true
+                    action: telegram_bot.send_photo
+                    data:
+                      url: >-
+                        {{ frigate_base_url }}/api/events/{{ event_id
+                        }}/snapshot-clean.webp
+                      caption: >-
+                        🚨 *ТРЕВОГА\!* Подтверждено обнаружение на камере *{{ camera_name[camera] | default(camera) }}*
+                      chat_id: "{{ chat_id }}"
+                      verify_ssl: "{{ verify_ssl_input }}"
+                      parse_mode: markdownv2
+                      config_entry_id: "{{ config_entry_id }}"
+                  - continue_on_error: true
+                    action: telegram_bot.answer_callback_query
+                    data:
+                      message: "🚨 Тревога отправлена"
+                      callback_query_id: "{{ callback_query_id }}"
+
+              # /send_review_preview
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'send_review_preview' }}"
+                sequence:
+                  - continue_on_error: true
+                    action: telegram_bot.send_video
+                    data:
+                      url: >-
+                        {{ frigate_base_url }}/api/review/{{ review_id }}/preview
+                      chat_id: "{{ chat_id }}"
+                      parse_mode: markdownv2
+                      verify_ssl: "{{ verify_ssl_input }}"
+                      config_entry_id: "{{ config_entry_id }}"
+                      caption: "📼 Review preview для {{ camera_name[camera] | default(camera) }}"
+                  - continue_on_error: true
+                    action: telegram_bot.answer_callback_query
+                    data:
+                      message: "📼 Review preview отправлен"
+                      callback_query_id: "{{ callback_query_id }}"
+
+mode: parallel
+max: 20
+max_exceeded: silent

@@ -17,11 +17,8 @@ Home Assistant автоматизации и blueprints для отправки 
 
 ```
 .
-├── frigate_telegram_notifications.yaml        # Основная автоматизация (NEW/UPDATE/END)
-├── frigate_telegram_callbacks.yaml             # Обработка inline-кнопок Telegram
-├── frigate_telegram_notifications_blueprint.yaml  # Blueprint версия уведомлений
-├── frigate_telegram_callbacks_blueprint.yaml      # Blueprint версия callback-команд
-└── AGENTS.md                                    # Документация по проекту
+├── frigate_telegram.yaml   # Blueprint: уведомления + callback-команды (всё в одном)
+└── AGENTS.md               # Документация по проекту
 ```
 
 ## Требования
@@ -52,10 +49,8 @@ Home Assistant автоматизации и blueprints для отправки 
 
 ### 3. Установка через Blueprint (рекомендуется)
 
-#### Уведомления (Frigate → Telegram)
-
 1. Настройки → Автоматизации и сценарии → Blueprints → Импортировать blueprint
-2. Вставьте URL или содержимое файла `frigate_telegram_notifications_blueprint.yaml`
+2. Вставьте URL или содержимое файла `frigate_telegram.yaml`
 3. Создайте автоматизацию из blueprint:
    - **Frigate URL**: `http://IP:5000`
    - **Telegram Config Entry ID**: полученный на шаге 2
@@ -63,23 +58,13 @@ Home Assistant автоматизации и blueprints для отправки 
    - **Список камер**: камеры Frigate через запятую (например: `cam_1,cam_2`)
    - **Префикс input_text**: `frigate_tg_msg` (если helpers названы `frigate_tg_msg_cam_1`)
 
-#### Callback-команды (Telegram → Frigate)
-
-1. Импортируйте `frigate_telegram_callbacks_blueprint.yaml`
-2. Заполните:
-   - **Frigate URL**: тот же URL
-   - **Telegram Config Entry ID**: тот же ID
+Один blueprint объединяет обе функции: уведомления о событиях и обработку inline-кнопок.
 
 ### 4. Установка через YAML (альтернатива)
 
-1. Скопируйте `frigate_telegram_notifications.yaml` в `configuration.yaml` или в папку `automations/`
-2. Скопируйте `frigate_telegram_callbacks.yaml` аналогично
-3. Отредактируйте переменные в начале каждой автоматизации:
-   - `frigate_base_url`
-   - `config_entry_id`
-   - `chat_id` список
-   - `camera_name` и другие маппинги при необходимости
-4. Перезагрузите автоматизации: Developer Tools → YAML → Automations → Reload
+1. Скопируйте содержимое `frigate_telegram.yaml` (без секции `blueprint:`) в `configuration.yaml` или в папку `automations/`
+2. Замените `!input` на конкретные значения в блоке `variables`
+3. Перезагрузите автоматизации: Developer Tools → YAML → Automations → Reload
 
 ### 5. Настройка Frigate
 
@@ -113,8 +98,7 @@ mqtt:
 2. Скопируйте файлы в репозиторий:
    ```bash
    git clone https://github.com/myusername/frigate-telegram-ha.git
-   cp frigate_telegram_notifications_blueprint.yaml frigate-telegram-ha/
-   cp frigate_telegram_callbacks_blueprint.yaml frigate-telegram-ha/
+   cp frigate_telegram.yaml frigate-telegram-ha/
    cp README.md frigate-telegram-ha/
    ```
 3. Создайте тег `release` или `version` (опционально)
@@ -124,17 +108,17 @@ mqtt:
 Для публикации в [Home Assistant Blueprint Exchange](https://community.home-assistant.io/c/blueprints-exchange/53):
 
 1. Создайте тему в категории Blueprints Exchange
-2. Заголовок: `[Blueprint] Frigate → Telegram Notifications`
-3. Вставьте содержимое blueprint файла в блок code
+2. Заголовок: `[Blueprint] Frigate ↔ Telegram: уведомления и callback-команды`
+3. Вставьте содержимое `frigate_telegram.yaml` в блок code
 4. Добавьте скриншоты примеров сообщений (опционально)
-5. Укажите теги: `frigate`, `telegram`, `notifications`, `nvr`
+5. Укажите теги: `frigate`, `telegram`, `notifications`, `nvr`, `blueprint`
 
 ### Импорт по URL
 
 Home Assistant поддерживает импорт blueprints по прямой ссылке на raw YAML:
 
 ```
-https://github.com/myusername/frigate-telegram-ha/raw/main/frigate_telegram_notifications_blueprint.yaml
+https://github.com/myusername/frigate-telegram-ha/raw/main/frigate_telegram.yaml
 ```
 
 Пользователи могут вставить этот URL в:
