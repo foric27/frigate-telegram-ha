@@ -12,7 +12,6 @@ conditions:
 actions:
   - variables:
       frigate_base_url: http://192.168.1.6:5000
-      frigate_base_url2: https://cam.foric27.ru
       object_name:
         person: человек🙍‍♂️
         face: лицо🧑
@@ -52,7 +51,6 @@ actions:
         speech: Речь 🗣️
         yell: Крик (громкий) 📢
         cat_roar: Рёв кота 🐱
-      id: "{{ trigger.payload_json['after']['id'] }}"
       id_data: >-
         {{ trigger.payload_json['after']['data']['detections'] | last |
         default(trigger.payload_json['after']['id']) }}
@@ -81,38 +79,18 @@ actions:
         value_template: "{{ type == 'new' }}"
     then:
       - continue_on_error: true
-        action: telegram_bot.send_photo
+        action: telegram_bot.send_animation
         data:
           caption: "{{ message_template }}"
           parse_mode: markdownv2
           url: >-
-            {{ frigate_base_url }}/api/events/{{ id_data
-            }}/snapshot.jpg?timestamp=1&bbox=1&crop=1&quality=90
+            {{ frigate_base_url }}/api/{{ camera }}/start/{{ start_time
+            }}/end/{{ now().timestamp() }}/preview.gif
           chat_id:
             - "442672175"
             - "2058806977"
           verify_ssl: false
           config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
-  - alias: UPDATE
-    if:
-      - alias: UPDATE ?
-        condition: template
-        value_template: "{{ type == 'update' }}"
-    then:
-      - continue_on_error: true
-        action: telegram_bot.send_photo
-        data:
-          caption: "{{ message_template }}"
-          parse_mode: markdownv2
-          url: >-
-            {{ frigate_base_url }}/api/events/{{ id_data
-            }}/snapshot.jpg?timestamp=1&bbox=1&crop=1&quality=90
-          chat_id:
-            - "442672175"
-            - "2058806977"
-          verify_ssl: false
-          config_entry_id: 01JZ7YKVZC1Z731645G07F76FN
-    enabled: false
   - alias: END
     if:
       - alias: END ?

@@ -21,13 +21,13 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 | Add audio detection type | `Frigate Motion Alert to Telegram new 2.yaml` → `audio_object` map |
 | Modify callback commands (video/snapshot) | `Frigate_telegram_run_command new.yaml` |
 | **Change camera whitelist** | `Frigate Motion Alert to Telegram new 2.yaml` → top-level `conditions` template list |
-| **Adjust snapshot quality** | `Frigate Motion Alert to Telegram new 2.yaml` → `snapshot.jpg` URL `quality` param |
+| **Adjust preview GIF range** | `Frigate Motion Alert to Telegram new 2.yaml` → `preview.gif` URL `start_time` / `end_time` params |
 
 ## CONVENTIONS
 - **Language:** All user-facing strings are Russian. Object/place names use Cyrillic.
 - **Templates:** Heavy Jinja2 in `value_template` and inline `message_template`. Home Assistant template syntax.
 - **Parse modes:** `markdownv2` for Telegram captions (requires MarkdownV2 escaping).
-- **URLs:** `frigate_base_url` (local) and `frigate_base_url2` (external) used for snapshots/clips.
+- **URLs:** `frigate_base_url` (local) used for preview.gif animations and event snapshots.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 - Do NOT use standard Markdown in `parse_mode: markdownv2` — Telegram MarkdownV2 requires escaping: `\(` `\)` `\.` `\!` etc.
@@ -39,8 +39,7 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - Trigger source: MQTT topic `frigate/reviews` (Frigate reviews API).
 - Automation modes: `parallel` with `max: 20` and `max_exceeded: silent`. High burst of events possible.
 - `config_entry_id` is hardcoded — tied to a specific Telegram bot integration instance in HA.
-- The `UPDATE` branch in the motion alert is `enabled: false` (can be enabled if real-time intermediate snapshots are desired).
 - Camera whitelist filter lives in top-level `conditions`; edit the inline list to include/exclude cameras.
-- Snapshot quality is set via `quality=90` query parameter on the JPG endpoint (only effective while event is in-progress).
+- `NEW` branch sends a live `preview.gif` (from `start_time` to `now()`); `END` branch sends the final `preview.gif` (from `start_time` to `end_time`).
 - All Telegram send actions use `continue_on_error: true` so a failed send does not block the automation.
 - `camera_name[camera] | default(camera)` is used so unknown cameras render gracefully.
