@@ -44,6 +44,9 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - Do NOT omit `| default([])` on `objects`, `sub_labels`, `audio`, or `zones` — missing `data` fields will crash the template otherwise.
 - Do NOT use `telegram_bot.edit_message` on media messages — use `edit_caption` for photos/videos/animations, `edit_replymarkup` for keyboards only.
 - Do NOT try to edit a message with `message_id: "last"` from a different chat — store exact `chat_id:message_id` pairs per camera.
+- Do NOT use `trigger.event.data.callback_query_id` — HA `telegram_callback` event stores the ID in `trigger.event.data.id`.
+- Do NOT pass `verify_ssl` to `telegram_bot.send_message` — only media-sending actions (`send_photo`, `send_video`, `send_animation`) accept it.
+- Do NOT rely on HA's native int parsing for large callback IDs — always cast with `trigger.event.data.id | string` to avoid precision loss (Telegram IDs exceed JS safe-integer range).
 
 ## NOTES
 - **Single blueprint**: `frigate_telegram.yaml` contains both MQTT triggers (`frigate/reviews`) and Telegram event triggers (`telegram_callback`). Uses `trigger.id` to branch between notification logic and callback logic.
@@ -60,3 +63,4 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - **Required HA helpers**: Create one `input_text` per camera named `input_text.frigate_tg_msg_cam_1` through `cam_6`. Max length should accommodate ~50 chars (e.g. `442672175:12345,2058806977:67890`).
 - **Callback UX**: All callback branches end with `telegram_bot.answer_callback_query` to remove the "loading" spinner from the button press.
 - `config_entry_id` is stored as a top-level variable to avoid repetition across branches.
+- **Known issues (being debugged)**: `input_text` helpers remain empty for some cameras — likely because `telegram_bot.send_animation` fails when `chat_id` receives a Jinja2 list. Fix: loop per chat ID, collect `chat_id:message_id` pairs, then save to helper. Awaiting NEW-branch trace to confirm.
