@@ -21,7 +21,7 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 | Change Telegram recipients | `frigate_telegram.yaml` → `chat_ids` input (blueprint) |
 | Add audio detection type | `frigate_telegram.yaml` → `audio_object` map |
 | Modify callback commands (video/snapshot/live/alarm) | `frigate_telegram.yaml` → callback branch (`send_video`, `send_snapshot`, etc.) |
-| **Change camera whitelist** | `frigate_telegram.yaml` → top-level `conditions` template (blueprint: `camera_whitelist` input) |
+| **Change camera whitelist** | `frigate_telegram.yaml` → top-level `conditions` template (blueprint: `camera_entities` input) |
 | **Adjust preview GIF range** | `frigate_telegram.yaml` → `preview.gif` URL `start_time` / `end_time` params in NEW branch |
 | **Change inline keyboard buttons** | `frigate_telegram.yaml` → `inline_keyboard` lists under NEW/END branches |
 | **Add new callback handler** | `frigate_telegram.yaml` → add `telegram_callback` trigger + nested `choose` branch |
@@ -50,7 +50,7 @@ Home Assistant YAML automations that bridge Frigate NVR events to Telegram notif
 - Trigger source: MQTT topic `frigate/reviews` (Frigate reviews API).
 - Automation mode: `parallel` with `max: 20` and `max_exceeded: silent`. High burst of events possible.
 - `config_entry_id` comes from blueprint input (`!input telegram_config_entry_id`).
-- Camera whitelist filter lives in top-level `conditions` using `trigger.id` check for safety.
+- Camera whitelist filter lives in top-level `conditions` using `trigger.id` check for safety. Blueprint input `camera_entities` uses `entity` selector with `domain: camera`; entity IDs are stripped of `camera.` prefix in the template condition.
 - `NEW` branch sends a live `preview.gif` (from `start_time` to `now()`); `END` branch sends the final `preview.gif` (from `start_time` to `end_time`).
 - All Telegram send actions use `continue_on_error: true` so a failed send does not block the automation.
 - `camera_name[camera] | default(camera)` is used so unknown cameras render gracefully.

@@ -32,7 +32,7 @@ Home Assistant автоматизации и blueprints для отправки 
 
 ### 1. Создание input_text helpers
 
-Для каждой камеры из белого списка создайте `input_text` helper:
+Для каждой выбранной в blueprint камеры создайте `input_text` helper:
 - Настройки → Устройства и службы → Помощники → Создать помощник → Text
 - Название: `frigate_tg_msg_cam_1`, `frigate_tg_msg_cam_2`, и т.д.
 - Максимальная длина: 255
@@ -55,8 +55,8 @@ Home Assistant автоматизации и blueprints для отправки 
    - **Frigate URL**: `http://IP:5000`
    - **Telegram Config Entry ID**: полученный на шаге 2
    - **Chat IDs**: ID ваших Telegram чатов через запятую (например: `123456789,987654321`)
-   - **Список камер**: камеры Frigate через запятую (например: `cam_1,cam_2`)
-   - **Префикс input_text**: `frigate_tg_msg` (если helpers названы `frigate_tg_msg_cam_1`)
+    - **Камеры**: выберите camera-сущности Home Assistant (соответствующие камерам Frigate)
+    - **Префикс input_text**: `frigate_tg_msg` (если helpers названы `frigate_tg_msg_cam_1`)
 
 Один blueprint объединяет обе функции: уведомления о событиях и обработку inline-кнопок.
 

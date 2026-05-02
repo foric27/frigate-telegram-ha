@@ -24,12 +24,14 @@ blueprint:
       selector:
         text:
       default: ""
-    camera_whitelist:
-      name: Список камер
-      description: "Камеры Frigate через запятую (например: cam_1,cam_2,cam_3)"
+    camera_entities:
+      name: Камеры Frigate
+      description: "Выберите camera-сущности Home Assistant, соответствующие камерам Frigate"
       selector:
-        text:
-      default: "cam_1,cam_2,cam_3,cam_4,cam_5,cam_6"
+        entity:
+          multiple: true
+          filter:
+            - domain: camera
     verify_ssl:
       name: Проверять SSL
       description: "Отключите для локальных URL без валидного сертификата"
@@ -86,7 +88,7 @@ conditions:
     value_template: >-
       {{ trigger.id != 'frigate_review' or
          ((trigger.payload_json | default({})).get('after', {}) | default({})).get('camera', '') in
-         (camera_whitelist | default('')).split(',') | map('trim') | list }}
+         (camera_entities | default([]) | map('replace', 'camera.', '') | list) }}
 
 # === ДЕЙСТВИЯ ===
 actions:
