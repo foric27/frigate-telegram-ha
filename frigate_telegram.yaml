@@ -101,7 +101,8 @@ actions:
   - variables:
       frigate_base_url: !input frigate_base_url
       config_entry_id: !input telegram_config_entry_id
-      chat_list: "{{ (chat_ids | default('')).split(',') | map('trim') | list }}"
+      chat_ids_raw: !input chat_ids
+      chat_list: "{{ (chat_ids_raw | default('')).split(',') | map('trim') | reject('eq', '') | list }}"
       verify_ssl_input: !input verify_ssl
       object_name:
         person: человек🙍‍♂️
