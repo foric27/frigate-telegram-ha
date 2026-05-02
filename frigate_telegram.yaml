@@ -313,7 +313,7 @@ actions:
           - variables:
               chat_id: "{{ trigger.event.data.chat_id }}"
               message_id: "{{ trigger.event.data.message.message_id }}"
-              callback_query_id: "{{ trigger.event.data.id }}"
+              callback_query_id: "{{ trigger.event.data.id | string }}"
               camera: >-
                 {{ trigger.event.data.args[0] if trigger.id in
                 ['send_video', 'send_live', 'send_alarm', 'send_review_preview'] else none }}
@@ -381,7 +381,6 @@ actions:
                         }}]({{ frigate_base_url }}/cameras/{{ camera }})
                       chat_id: "{{ chat_id }}"
                       parse_mode: markdownv2
-                      verify_ssl: "{{ verify_ssl_input }}"
                       config_entry_id: "{{ config_entry_id }}"
                   - continue_on_error: true
                     action: telegram_bot.answer_callback_query
