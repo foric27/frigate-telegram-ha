@@ -118,7 +118,7 @@ mqtt:
 Home Assistant поддерживает импорт blueprints по прямой ссылке на raw YAML:
 
 ```
-https://github.com/foric27/frigate-telegram-ha/raw/main/frigate_telegram.yaml
+https://raw.githubusercontent.com/foric27/frigate-telegram-ha/master/frigate_telegram.yaml
 ```
 
 Пользователи могут вставить этот URL в:
